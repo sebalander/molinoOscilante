@@ -34,50 +34,56 @@ Se calcularon las coordenadas de los keypoints en un frame anterior con la funci
 
 Es decir que se tienen las coordenadas de los keypoints en el frame anterior y en el nuevo: (xOld, yOld) y (xNew, yNew)
 
-Estimo la velocidad del keypoint como
-
-(Ux, Uy) =  (xNew - xOld, yNew - yOld). 
-
 ### Modelo del movimiento de los keypoints
 
 Si es un keypoint que no pertenece al molino, es del fondo, debería cuplir
 
-(Ux, Uy) = (Vx, Vy)
+xNew = xOld + Vx
+
+yNew = yOld + Vy
 
 para todos los keypoints del frame, o sea (Vx, Vy) es el desplazamiento global del frame
 
-Pero si tengo que describir los puntos en el molino que gira lo hago como si estuvieran en un disco de velocidad angular w con centro en (Cx, Cy):
+Pero si tengo que describir los puntos en el molino que gira, además de desplazarse la camara tengo que pensar que es como si estuvieran en un disco de velocidad angular w con centro en (Cx, Cy):
 
-Ux = - w (yNew - Cy) + Vx
+xNew = xOld + Vx - w (yNew - Cy)
 
-Uy = w (xNew - Cx) + Vy
+yNew = yOld + Vy + w (xNew - Cx)
 
-Hay que sumar ademas que el disco se mueve con el frame, por eso sumé Vx, Vy.
+Peeeero el tema es que yo no se si un keypoint es del fondo o no. Asi que inventé una función de membresía alfa que tienda a 0 (cero) si el keypoint es del fondo y se acerque a 1 (uno) si es del molino. Y para no complicarme la vida la definí con la siguiente idea: "si la velocidad del keypoint es muy cercana a la velocidad del fondo es que pertence al fondo". En simbolos
 
-Peeeero el tema es que yo no se si un keypoint es del fondo o no. Asi que inventé una función de membresía alfa que es cero si el keypoint es del fondo y es uno si es del molino. Y para no complicarme la vida la definí con la siguiente idea: "si la velocidad del keypoint es muy cercana a la velocidad del fondo es que pertence al fondo". En simbolos
+Ux = xNew - xOld
 
-alfa = 1 - exp( - ((Ux-Vx)^2 - (Uy - Vy)^2 ) / vS^2 )
+Uy = yNew - yOld
 
-el parametro vS me permite controlar que tan parecidas tienen que ser las velocidades, lo deje vS=1 despues de un par de pruebas.
+alfa = 1 - exp( - ( (Ux - Vx)^2 - (Uy - Vy)^2 ) / vS^2 )
+
+el parametro vS me permite controlar que tan parecidas tienen que ser las velocidades, lo deje vS=1 despues de un par de pruebas, mirar histogramas de las velocidades y demás.
 Finalmente el modelo del movimiento del keypoint es 
 
-Ux = - alfa w (yNew - Cy) + Vx
+Ux = Vx - alfa w (yNew - Cy)
 
-Uy = alfa w (xNew - Cx) + Vy
+Uy = Vy + alfa w (xNew - Cx)
 
 
 ### estimando w
-ahora que tengo un modelo que describe el movimiento de los keypoints con los parametros (Vx, Vy, w, Cx, Cy) y una lista de datos (xNew, yNew, Ux, Uy) de cada keypoint es cuestion de encontrar cuanto valen esos parametros.
+ahora que tengo un modelo que describe el movimiento de los keypoints con los parametros (Vx, Vy, w, Cx, Cy) y una lista de datos (xNew, yNew, Ux, Uy) de cada keypoint es cuestion de encontrar cuanto valen esos parametros. Recordar que los 5 parametros, desplazamiento de la camara, velocidad angular del molino y centro del molino, son comunes a todos los keypoints. 
 
-defino una función de optimizacion al viejo estilo de error cuadrático entre lo que dice el modelo y lo que miden los datos
+Defino una función de optimizacion al viejo estilo de error cuadrático entre lo que dice el modelo y lo que miden los datos
 
-ex = - w (yNew - Cy) + Vx - Ux
+Ux = xNew - xOld
 
-ey = w (xNew - Cx) + Vy - Uy
+Uy = yNew - yOld
+
+alfa = 1 - exp( - (Ux-Vx)^2 - (Uy - Vy)^2 )
+
+ex = Vx - alfa w (yNew - Cy) - Ux
+
+ey = Vy + alfa w (xNew - Cx) - Uy
 
 E = ex^2 + ey^2  [suma para todos los keypoints]
 
-Y para cada frame minimizo el escalar E obteniendo los 5 parametros.
+Y para cada frame minimizo el escalar E obteniendo los 5 parametros con el ![metodo Powell disponible en scipy](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html#scipy.optimize.minimize)
 
 ## Resultados
 
